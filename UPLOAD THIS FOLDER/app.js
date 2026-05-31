@@ -32,7 +32,7 @@
     { id: 'explore', title: 'Explore More', desc: 'Extra recovery tips', sec: 0 },
   ];
 
-  const EM_FIRST = 30 * 60 * 1000;
+  const EM_FIRST = 10 * 60 * 1000; // 10 min instead of 30
   const EM_COOLDOWN = 60 * 60 * 1000;
   const EM_TIMEOUT = 15;
 
@@ -43,6 +43,7 @@
   let emCountdown = EM_TIMEOUT;
   let activeTimer = null;
   let coachSport = null;
+  let renderScheduled = false;
 
   function loadState() {
     try {
@@ -77,6 +78,16 @@
     }));
   }
 
+  // Optimized render - debounced to prevent lag
+  function scheduleRender() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => {
+      renderScheduled = false;
+      performRender();
+    });
+  }
+
   function points() { return Math.floor(state.distanceKm); }
   function injuryRisk() {
     if (state.heartRate > 165 || state.steps > 12000) return 'high';
@@ -101,7 +112,7 @@
     state.protectionStart = Date.now();
     state.gearConnected = {};
     GEAR.forEach((g, i) => {
-      gearTimers.push(setTimeout(() => { state.gearConnected[g.id] = true; render(); }, 800 + i * 600));
+      gearTimers.push(setTimeout(() => { state.gearConnected[g.id] = true; scheduleRender(); }, 800 + i * 600));
     });
     if (simTimer) clearInterval(simTimer);
     simTimer = setInterval(() => {
@@ -110,9 +121,9 @@
       state.heartRate = Math.min(185, Math.max(85, state.heartRate + (Math.random() > 0.5 ? 1 : -1)));
       state.activityMin += 1 / 60;
       checkEmergency();
-      render();
+      scheduleRender();
     }, 2000);
-    render();
+    scheduleRender();
   }
 
   function stopProtection() {
@@ -135,7 +146,7 @@
     gearTimers.forEach(clearTimeout);
     gearTimers = [];
     save();
-    render();
+    scheduleRender();
   }
 
   function checkEmergency() {
@@ -161,7 +172,7 @@
         alert('⚠️ No response.\n\nAuto-locating position...\nCalling emergency services (911)...\nContacts notified.');
       }
     }, 1000);
-    render();
+    scheduleRender();
   }
 
   function dismissEmergency(safe, auto) {
@@ -170,7 +181,7 @@
     if (emTimer) { clearInterval(emTimer); emTimer = null; }
     if (!safe && !auto) alert('🚨 Emergency sent!\nLocation shared. Contacts notified. Ambulance dispatched.');
     save();
-    render();
+    scheduleRender();
   }
 
   function coachReply(msg) {
@@ -178,13 +189,13 @@
     if (/^(hi|hello|hey|yo|sup|hola)\b/i.test(t))
       return `Hello! I'm Coach ${state.coach.name}, your ${state.coach.sport} specialist.\n\nHow can I help you today?`;
     const l = t.toLowerCase();
-    if (/knee|patella/i.test(l)) return 'For knee discomfort:\n\n1. Reduce impact 30% this week\n2. Ice 15 min post-session\n3. VMO terminal extensions 3×12\n4. Try cycling for low impact\n\nSee a physio if pain persists 48h+.';
+    if (/knee|patella/i.test(l)) return 'For knee discomfort:\n\n1. Reduce impact 30% this week\n2. Ice 15 min post-session\n3. VMO terminal extensions 3×12\n4. Try cycling for low impact';
     if (/ankle|sprain/i.test(l)) return 'Ankle protocol:\n\n1. RICE immediately\n2. Single-leg balance 3×30s/side\n3. Calf raises 3×15 eccentric\n4. Return only when hop test is pain-free.';
-    if (/injur|pain|hurt|sore/i.test(l)) return 'Injury prevention:\n\n• 8–10 min dynamic warm-up\n• Max 10% weekly load increase\n• 7–9h sleep, 1.6g protein/kg\n• Monitor joint stress via gear sensors\n\nPrioritize recovery today based on your risk level.';
+    if (/injur|pain|hurt|sore/i.test(l)) return 'Injury prevention:\n\n• 8–10 min dynamic warm-up\n• Max 10% weekly load increase\n• 7–9h sleep, 1.6g protein/kg\n• Monitor joint stress daily';
     if (/run|jog|marathon/i.test(l)) return 'Running plan:\n\n1. Cadence 170–180 spm\n2. Easy runs 60–70% max HR\n3. Long run +10% distance/week max\n4. Hip bridges + SL deadlifts 2×/week';
-    if (/rest|tired|fatigue|sleep/i.test(l)) return 'Recovery focus:\n\n• Active recovery: 20 min walk\n• 8h sleep tonight\n• Carbs + protein within 30 min post-workout\n• Foam roll quads, calves 60s each';
+    if (/rest|tired|fatigue|sleep/i.test(l)) return 'Recovery focus:\n\n• Active recovery: 20 min walk\n• 8h sleep tonight\n• Carbs + protein within 30 min post-workout\n• Foam roll quads & calves';
     if (/stretch|flex|mobility/i.test(l)) return '10 min stretch:\n\n1. Hip flexor lunge 45s/side\n2. Hamstring 45s/side\n3. Pigeon 60s/side\n4. Thoracic rotation ×10\n5. Calf wall 45s/side';
-    return `Thank you for your question. As your ${state.coach.sport} coach, I recommend assessing load vs recovery, targeted mobility, and adjusting intensity for 48h. Share which movement triggers symptoms for a precise protocol.`;
+    return `Thank you for your question. As your ${state.coach.sport} coach, I recommend assessing load vs recovery, targeted mobility, and adjusting intensity for 48h. Keep me posted!`;
   }
 
   function route() {
@@ -286,7 +297,7 @@
     {
       id: 'alerts', icon: '🔔', title: 'Real-time Alerts', cls: 'alerts',
       desc: 'Instant notifications when gear sensors detect elevated injury risk during activity.',
-      unlocks: ['30-min smart emergency popup', 'Safe / Emergency one-tap response', 'Auto location & ambulance dispatch', '1-hour alert cooldown after dismiss'],
+      unlocks: ['10-min smart emergency popup', 'Safe / Emergency one-tap response', 'Auto location & ambulance dispatch', '1-hour alert cooldown after dismiss'],
       previews: ['Live risk alerts', 'Emergency SOS', 'Contact notify'],
       link: null,
     },
@@ -315,7 +326,7 @@
         </div>
         <div class="premium-unlock-list"><ul style="margin:0;padding:0">${list}</ul></div>
         ${unlocked
-          ? (f.link ? `<a href="#${f.link}" class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;padding:10px;font-size:13px">${f.linkLabel}</a>` : '<div style="margin-top:12px;font-size:12px;color:var(--safe);font-weight:600">✓ Active & monitoring</div>')
+          ? (f.link ? `<a href="#${f.link}" class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;margin-top:12px;padding:10px;font-size:13px">${f.linkLabel}</a>` : '')
           : `<div class="premium-lock-strip"><span>🔒 Premium unlocks this</span><span>Subscribe →</span></div>`}
       </div>`;
   }
@@ -514,7 +525,7 @@
         <div class="chat-msgs" id="chat-msgs">${state.chats.map(m => `
           <div class="bubble ${m.role}">${esc(m.text)}<div style="font-size:10px;opacity:.6;margin-top:4px">${m.time}</div></div>`).join('')}</div>
         <div class="chat-input-bar"><div class="inner">
-          <input id="chat-in" placeholder="Ask your coach..." />
+          <input id="chat-in" placeholder="Ask your coach..." spellcheck="true" />
           <button id="chat-send">Send</button>
         </div></div>`;
     }
@@ -576,7 +587,7 @@
       <a href="#/gear" class="glass link-card mb12">📡 Gear Settings</a>
       <a href="#/premium" class="glass link-card mb12">👑 Premium Subscription</a>
       <div class="glass" style="padding:14px;display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-weight:500">Emergency Alerts</div><div style="font-size:11px;color:var(--muted)">First alert after 30 min · 1hr cooldown</div></div>
+        <div><div style="font-weight:500">Emergency Alerts</div><div style="font-size:11px;color:var(--muted)">First alert after 10 min · 1hr cooldown</div></div>
         <div style="width:44px;height:24px;background:var(--safe);border-radius:12px;position:relative"><div style="position:absolute;right:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%"></div></div>
       </div>
       <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:24px">SportGuard Pro v1.0 · ${state.premium?'Premium':'Free'}</p>`;
@@ -652,7 +663,7 @@
 
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  function render() {
+  function performRender() {
     const r = route();
     const pages = {
       '/': renderHome, '/assessment': renderAssessment, '/gear': renderGear,
@@ -668,6 +679,10 @@
     bindEvents();
     const cm = document.getElementById('chat-msgs');
     if (cm) cm.scrollTop = cm.scrollHeight;
+  }
+
+  function render() {
+    scheduleRender();
   }
 
   function bindEvents() {
@@ -720,7 +735,7 @@
       state.coach = null; state.chats = []; save(); nav('/coach'); render();
     });
     document.getElementById('chat-send')?.addEventListener('click', sendChat);
-    document.getElementById('chat-in')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+    document.getElementById('chat-in')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } });
   }
 
   function showCoachModal(sport) {
