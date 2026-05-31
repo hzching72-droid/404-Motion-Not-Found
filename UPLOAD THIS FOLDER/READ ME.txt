@@ -1,0 +1,6 @@
+DRAG THIS ENTIRE FOLDER onto https://app.netlify.com/drop
+
+You will get a link like https://something.netlify.app
+Share that link — everyone in the world can open your app.
+
+Do NOT upload only index.html. Upload this whole folder.
